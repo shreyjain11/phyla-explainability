@@ -1,10 +1,3 @@
-"""
-CORRECT PHYLA-MAMBALRP ADAPTER
-
-KEY INSIGHT: Use Phyla's NATIVE forward pass, not manual reconstruction!
-The model's forward() method already does everything correctly.
-"""
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
