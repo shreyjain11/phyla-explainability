@@ -46,7 +46,7 @@ class SimplePhylaAnalyzer:
         sequences: List[str],
         sequence_names: List[str],
         ground_truth_distances: Optional[np.ndarray] = None,
-        method: str = 'l2_norm',  # Options: 'l2_norm', 'cosine', 'last2_avg'
+        method: str = 'l2_norm',
         verbose: bool = False
     ) -> SimplePhylaResult:
         """
@@ -62,7 +62,6 @@ class SimplePhylaAnalyzer:
             print(f"[SIMPLE] Method: {method}")
             print(f"[SIMPLE] Sequences: {len(sequences)}")
         
-        # Encode
         input_ids, cls_token_mask, sequence_mask, _ = self.phyla_model.encode(sequences, sequence_names)
         input_ids = input_ids.to(self.device)
         cls_token_mask = cls_token_mask.to(self.device)
@@ -70,7 +69,6 @@ class SimplePhylaAnalyzer:
         
         with torch.no_grad():
             if method == 'last2_avg':
-                # Extract from last 2 modules
                 x = self.phyla_model.modul[0](
                     input_ids,
                     logits=False,
@@ -79,7 +77,6 @@ class SimplePhylaAnalyzer:
                     cls_token_mask=cls_token_mask
                 )
                 
-                # Forward through all but last 2
                 for module in self.phyla_model.modul[1:-2]:
                     correct_device = next(module.parameters()).device
                     x = module(
@@ -91,7 +88,6 @@ class SimplePhylaAnalyzer:
                         cls_token_mask=cls_token_mask.to(correct_device)
                     )
                 
-                # Get second-to-last layer
                 if len(self.phyla_model.modul) >= 2:
                     module = self.phyla_model.modul[-2]
                     correct_device = next(module.parameters()).device
@@ -104,14 +100,12 @@ class SimplePhylaAnalyzer:
                         cls_token_mask=cls_token_mask.to(correct_device)
                     )
                     
-                    # Extract CLS from second-to-last
                     cls_second_last = x[cls_token_mask.to(correct_device)].view(
                         cls_token_mask.shape[0], cls_token_mask.sum(dim=1)[0], -1
                     ).to(self.device)
                 else:
                     cls_second_last = None
                 
-                # Get last layer
                 module = self.phyla_model.modul[-1]
                 x = module(
                     x.to(self.device),
@@ -122,13 +116,11 @@ class SimplePhylaAnalyzer:
                     cls_token_mask=cls_token_mask
                 )
                 
-                # Extract CLS from last
                 if x.dim() == 3:
                     cls_last = x.squeeze(0)
                 else:
                     cls_last = x
                 
-                # Average last 2 layers
                 if cls_second_last is not None:
                     if cls_second_last.dim() == 3:
                         cls_second_last = cls_second_last.squeeze(0)
@@ -141,10 +133,8 @@ class SimplePhylaAnalyzer:
                         print(f"[SIMPLE] Using only last layer (single module model)")
             
             else:
-                # Standard: just forward through model
                 x = self.phyla_model(input_ids, sequence_mask, cls_token_mask)
                 
-                # Extract CLS tokens
                 if x.dim() == 3:
                     sequence_rep = x.squeeze(0)
                 else:
@@ -153,9 +143,7 @@ class SimplePhylaAnalyzer:
             if verbose:
                 print(f"[SIMPLE] Embedding shape: {sequence_rep.shape}")
             
-            # Compute distances based on method
             if method == 'cosine':
-                # Cosine distance
                 normed = F.normalize(sequence_rep, p=2, dim=-1)
                 cos_sim = torch.mm(normed, normed.T)
                 pairwise_distances = 1.0 - cos_sim
@@ -164,7 +152,6 @@ class SimplePhylaAnalyzer:
                     print(f"[SIMPLE] Using cosine distance")
             
             elif method in ['l2_norm', 'last2_avg']:
-                # L2 normalize then Euclidean
                 normed = F.normalize(sequence_rep, p=2, dim=-1)
                 euclidean = torch.cdist(normed, normed, compute_mode='donot_use_mm_for_euclid_dist')
                 pairwise_distances = euclidean.max() - euclidean
@@ -173,7 +160,6 @@ class SimplePhylaAnalyzer:
                     print(f"[SIMPLE] Using L2-normalized Euclidean (inverted)")
             
             else:
-                # Fallback: regular inverted Euclidean
                 euclidean = torch.cdist(sequence_rep, sequence_rep, compute_mode='donot_use_mm_for_euclid_dist')
                 pairwise_distances = euclidean.max() - euclidean
                 
@@ -183,7 +169,6 @@ class SimplePhylaAnalyzer:
             if verbose:
                 print(f"[SIMPLE] Distance range: [{pairwise_distances.min():.3f}, {pairwise_distances.max():.3f}]")
         
-        # Compute correlation
         distance_correlation = None
         if ground_truth_distances is not None:
             gt_tensor = torch.from_numpy(ground_truth_distances).float().to(self.device)

@@ -41,69 +41,47 @@ def compute_position_phylogenetic_signal(
         objective: scalar to maximize
     """
     
-    # Extract per-position embeddings (excluding CLS tokens)
-    position_embeddings = hidden_states[~cls_token_mask]  # [num_positions, dim]
-    position_seq_ids = sequence_mask[~cls_token_mask]      # [num_positions] which seq each pos belongs to
+    position_embeddings = hidden_states[~cls_token_mask]
+    position_seq_ids = sequence_mask[~cls_token_mask]
     
-    # Strategy 1: If we have ground truth, use it to weight positions
     if ground_truth_distances is not None:
-        # For each position, compute if its embedding distances match phylogenetic distances
-        
         num_seqs = cls_token_mask.sum().item()
         seq_ids = torch.unique(position_seq_ids)
-        
-        # Group positions by which amino acid position they represent
-        # (All sequences should have same length in aligned data)
         tokens_per_seq = (~cls_token_mask[0]).sum().item() // num_seqs
         
         position_objectives = []
         
-        # For each amino acid position across all sequences
-        for pos_idx in range(min(tokens_per_seq, 100)):  # Limit to first 100 positions for speed
-            # Get embedding at this position for each sequence
+        for pos_idx in range(min(tokens_per_seq, 100)):
             pos_embeddings = []
             for seq_id in range(num_seqs):
-                # Find tokens belonging to this sequence
                 seq_tokens = (position_seq_ids == seq_id).nonzero(as_tuple=True)[0]
                 if pos_idx < len(seq_tokens):
                     pos_embeddings.append(position_embeddings[seq_tokens[pos_idx]])
             
             if len(pos_embeddings) == num_seqs:
-                pos_embeddings = torch.stack(pos_embeddings)  # [num_seqs, dim]
+                pos_embeddings = torch.stack(pos_embeddings)
                 
-                # Compute pairwise distances at this position
                 pos_distances = torch.cdist(pos_embeddings.unsqueeze(0), 
                                            pos_embeddings.unsqueeze(0))[0]
-                
-                # Invert (model puts similar close)
                 pos_distances_inv = pos_distances.max() - pos_distances
-                
-                # Compare with ground truth
                 gt_device = ground_truth_distances.to(pos_distances.device)
                 
-                # Correlation at this position
                 n = min(num_seqs, gt_device.shape[0])
                 pos_vec = pos_distances_inv[:n, :n][torch.triu_indices(n, n, offset=1)[0],
                                                      torch.triu_indices(n, n, offset=1)[1]]
                 gt_vec = gt_device[:n, :n][torch.triu_indices(n, n, offset=1)[0],
                                             torch.triu_indices(n, n, offset=1)[1]]
                 
-                # Negative MSE (we maximize)
                 pos_obj = -F.mse_loss(pos_vec / (pos_vec.max() + 1e-8), 
                                       gt_vec / (gt_vec.max() + 1e-8))
-                
                 position_objectives.append(pos_obj)
         
-        # Average across positions
         if position_objectives:
             return torch.stack(position_objectives).mean()
         else:
             return torch.tensor(0.0, device=hidden_states.device, requires_grad=True)
     
     else:
-        # Strategy 2: No ground truth - maximize position-wise variance
-        # Positions that discriminate between sequences should have high variance
-        
         num_seqs = cls_token_mask.sum().item()
         tokens_per_seq = (~cls_token_mask[0]).sum().item() // num_seqs
         
@@ -118,7 +96,6 @@ def compute_position_phylogenetic_signal(
             
             if len(pos_embeddings) >= 2:
                 pos_embeddings = torch.stack(pos_embeddings)
-                # Variance across sequences at this position
                 pos_var = torch.var(pos_embeddings, dim=0).mean()
                 position_variances.append(pos_var)
         
@@ -148,10 +125,9 @@ def grad_x_input_position_aware(
         raise RuntimeError("Gradients are None")
     
     with torch.no_grad():
-        R = (embeddings * grads).sum(dim=2)  # [batch, total_tokens]
+        R = (embeddings * grads).sum(dim=2)
         
         if normalize:
-            # Normalize per sequence
             start = 0
             for L in sequence_lengths:
                 end = start + L + 1
@@ -188,13 +164,11 @@ class PositionAwarePhylaMambaLRPAnalyzer:
         Analyze with POSITION-AWARE objective
         """
         
-        # Encode
         input_ids, cls_token_mask, sequence_mask, _ = self.phyla_model.encode(sequences, sequence_names)
         input_ids = input_ids.to(self.device)
         cls_token_mask = cls_token_mask.to(self.device)
         sequence_mask = sequence_mask.to(self.device)
         
-        # Convert ground truth
         gt_tensor = None
         if ground_truth_distances is not None:
             gt_tensor = torch.from_numpy(ground_truth_distances).float()
@@ -208,15 +182,12 @@ class PositionAwarePhylaMambaLRPAnalyzer:
         seq_lengths = [len(s) for s in sequences]
         
         with torch.enable_grad():
-            # Get embeddings
             embedding_layer = self.phyla_model.modul[0].backbone.embedding
             embeddings = embedding_layer(input_ids)
             embeddings = embeddings.requires_grad_(True)
             
-            # Forward through model
             hidden_states = embeddings
             
-            # First module
             hidden_states = self.phyla_model.modul[0].backbone(
                 hidden_states,
                 inference_params=None,
@@ -224,7 +195,6 @@ class PositionAwarePhylaMambaLRPAnalyzer:
                 hidden_states_given=True
             )
             
-            # Middle modules
             for module in self.phyla_model.modul[1:-1]:
                 correct_device = next(module.parameters()).device
                 hidden_states = module(
@@ -236,7 +206,6 @@ class PositionAwarePhylaMambaLRPAnalyzer:
                     cls_token_mask=cls_token_mask.to(correct_device)
                 )
             
-            # Last module
             output = self.phyla_model.modul[-1](
                 hidden_states.to(self.device),
                 hidden_states_given=True,
@@ -246,13 +215,11 @@ class PositionAwarePhylaMambaLRPAnalyzer:
                 cls_token_mask=cls_token_mask
             )
             
-            # Extract sequence representations for distance computation
             if output.dim() == 3 and output.size(1) == cls_token_mask.sum(dim=1)[0].item():
                 sequence_rep = output
             else:
                 sequence_rep = output[cls_token_mask].view(1, cls_token_mask.sum().item(), -1)
             
-            # CRITICAL: Compute POSITION-AWARE objective
             objective = compute_position_phylogenetic_signal(
                 hidden_states,
                 cls_token_mask,
@@ -262,15 +229,12 @@ class PositionAwarePhylaMambaLRPAnalyzer:
             
             print(f"[POSITION-AWARE] Objective: {objective.item():.6f}")
             
-            # Compute gradients
             relevances = grad_x_input_position_aware(embeddings, objective, seq_lengths, normalize=True)
         
-        # Compute pairwise distances
         with torch.no_grad():
             euclidean_dist = torch.cdist(sequence_rep[0], sequence_rep[0])
             pairwise_distances = euclidean_dist.max() - euclidean_dist
         
-        # Correlation with ground truth
         distance_correlation = None
         if gt_tensor is not None:
             with torch.no_grad():

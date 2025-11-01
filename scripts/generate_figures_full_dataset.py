@@ -25,7 +25,6 @@ from Phyla.phyla.model.model import Phyla
 
 # High-quality publication styling
 def apply_publication_style():
-    """Professional publication-ready matplotlib style"""
     plt.style.use('seaborn-v0_8-whitegrid')
     plt.rcParams.update({
         'font.size': 13,
@@ -61,7 +60,6 @@ def load_validation_results(filepath):
     with open(filepath, 'r') as f:
         lines = f.readlines()
     
-    # Extract statistics from header
     stats = {}
     for line in lines[:15]:
         if 'Mean r:' in line:
@@ -75,13 +73,12 @@ def load_validation_results(filepath):
         elif 'Max r:' in line:
             stats['max_r'] = float(line.split(':')[1].strip())
     
-    # Find results table
     results = []
     start_idx = None
     
     for i, line in enumerate(lines):
         if 'ALL RESULTS' in line or 'Alignment' in line and 'Status' in line:
-            start_idx = i + 2  # Skip header line
+            start_idx = i + 2
             break
     
     if start_idx:
@@ -97,7 +94,6 @@ def load_validation_results(filepath):
                     n = int(parts[1])
                     r = float(parts[2])
                     
-                    # Determine status
                     if r > 0.90:
                         status = 'excellent'
                     elif r > 0.70:
@@ -161,9 +157,6 @@ def load_ground_truth_from_gcs(bucket_name, blob_name):
     return np.load(BytesIO(content))
 
 
-# ============================================================================
-# FIGURE 1: Correlation Distribution with Density (High Quality)
-# ============================================================================
 def plot_correlation_distribution_advanced(results, stats, output_path):
     """Advanced correlation distribution with KDE and biological insights"""
     
@@ -171,11 +164,9 @@ def plot_correlation_distribution_advanced(results, stats, output_path):
     
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 10), gridspec_kw={'height_ratios': [3, 1]})
     
-    # Main histogram with KDE overlay
     n, bins, patches = ax1.hist(r_values, bins=50, edgecolor='black', alpha=0.7, 
                                  color='#3498db', density=True, label='Distribution')
     
-    # Color bars by performance
     for i, patch in enumerate(patches):
         bin_center = (bins[i] + bins[i+1]) / 2
         if bin_center > 0.90:
@@ -185,19 +176,16 @@ def plot_correlation_distribution_advanced(results, stats, output_path):
         elif bin_center > 0.50:
             patch.set_facecolor('#f39c12')  # Moderate
         else:
-            patch.set_facecolor('#e74c3c')  # Weak
+            patch.set_facecolor('#e74c3c')
     
-    # KDE overlay
     kde = gaussian_kde(r_values)
     x_kde = np.linspace(r_values.min(), r_values.max(), 200)
     ax1.plot(x_kde, kde(x_kde), 'k-', linewidth=3, label='Density (KDE)', alpha=0.8)
     
-    # Performance thresholds
     ax1.axvline(0.90, color='#27ae60', linestyle='--', linewidth=2.5, alpha=0.8, label='Excellent (r>0.90)')
     ax1.axvline(0.70, color='#3498db', linestyle='--', linewidth=2.5, alpha=0.8, label='Strong (r>0.70)')
     ax1.axvline(0.50, color='#f39c12', linestyle='--', linewidth=2.5, alpha=0.8, label='Moderate (r>0.50)')
     
-    # Mean and median
     mean_r = stats['mean_r']
     median_r = stats['median_r']
     ax1.axvline(mean_r, color='darkred', linestyle='-', linewidth=3, label=f'Mean (r={mean_r:.3f})')
@@ -210,7 +198,6 @@ def plot_correlation_distribution_advanced(results, stats, output_path):
     ax1.legend(loc='upper left', frameon=True, fancybox=True, shadow=True, fontsize=11)
     ax1.grid(True, alpha=0.3)
     
-    # Box plot below
     bp = ax2.boxplot([r_values], vert=False, widths=0.5, patch_artist=True,
                      boxprops=dict(facecolor='#3498db', alpha=0.6),
                      medianprops=dict(color='darkred', linewidth=3),
@@ -221,7 +208,6 @@ def plot_correlation_distribution_advanced(results, stats, output_path):
     ax2.set_yticks([])
     ax2.grid(True, alpha=0.3, axis='x')
     
-    # Add quartile annotations
     q1, q2, q3 = np.percentile(r_values, [25, 50, 75])
     ax2.text(q1, 0.3, f'Q1={q1:.2f}', ha='center', fontsize=11, fontweight='bold')
     ax2.text(q2, 0.3, f'Median={q2:.2f}', ha='center', fontsize=11, fontweight='bold')
@@ -234,13 +220,9 @@ def plot_correlation_distribution_advanced(results, stats, output_path):
     print(f"✓ Figure 1 saved: {output_path}")
 
 
-# ============================================================================
-# FIGURE 2: Performance Breakdown with Insights
-# ============================================================================
 def plot_performance_breakdown_detailed(results, stats, output_path):
     """Detailed performance breakdown with biological context"""
     
-    # Categorize
     excellent = [r for r in results if r['r'] > 0.90]
     strong = [r for r in results if 0.70 < r['r'] <= 0.90]
     moderate = [r for r in results if 0.50 < r['r'] <= 0.70]
@@ -260,7 +242,6 @@ def plot_performance_breakdown_detailed(results, stats, output_path):
     bars = ax1.bar(categories, counts, color=colors, edgecolor='black', 
                    linewidth=2, alpha=0.85, width=0.7)
     
-    # Add detailed labels
     for bar, count, pct in zip(bars, counts, percentages):
         height = bar.get_height()
         ax1.text(bar.get_x() + bar.get_width()/2., height + max(counts)*0.01,
@@ -273,14 +254,12 @@ def plot_performance_breakdown_detailed(results, stats, output_path):
     ax1.set_ylim(0, max(counts) * 1.18)
     ax1.grid(axis='y', alpha=0.3, linewidth=1.2)
     
-    # Right: Pie chart with biological interpretation
     ax2.pie(counts, labels=categories, colors=colors, autopct='%1.1f%%',
             startangle=90, textprops={'fontsize': 12, 'fontweight': 'bold'},
             wedgeprops={'edgecolor': 'black', 'linewidth': 2, 'alpha': 0.85})
     
     ax2.set_title('Performance Distribution', fontweight='bold', fontsize=16)
     
-    # Add biological interpretation text
     interpretation = (
         f"Biological Insights:\n\n"
         f"• Model achieves excellent correlation (r>0.90) on {len(excellent):,} families ({percentages[0]:.1f}%)\n"
@@ -302,16 +281,12 @@ def plot_performance_breakdown_detailed(results, stats, output_path):
     print(f"✓ Figure 2 saved: {output_path}")
 
 
-# ============================================================================
-# FIGURE 3: Correlation vs Alignment Size with Biological Insights
-# ============================================================================
 def plot_correlation_vs_size_detailed(results, output_path):
     """Detailed scatter with size-based analysis"""
     
     n_seqs = np.array([res['n_sequences'] for res in results])
     r_values = np.array([res['r'] for res in results])
     
-    # Color and size by performance
     colors = []
     sizes = []
     for r in r_values:
@@ -330,18 +305,15 @@ def plot_correlation_vs_size_detailed(results, output_path):
     
     fig, ax = plt.subplots(figsize=(14, 8))
     
-    # Scatter with variable sizes
     scatter = ax.scatter(n_seqs, r_values, c=colors, s=sizes, alpha=0.6, 
                         edgecolors='black', linewidth=1.2)
     
-    # Trend line
     z = np.polyfit(n_seqs, r_values, 1)
     p = np.poly1d(z)
     x_trend = np.linspace(n_seqs.min(), n_seqs.max(), 100)
     ax.plot(x_trend, p(x_trend), "k--", alpha=0.6, linewidth=3, 
             label=f'Linear Trend: r = {z[0]:.4f}×n + {z[1]:.3f}')
     
-    # Moving average
     window_size = 50
     sorted_idx = np.argsort(n_seqs)
     n_sorted = n_seqs[sorted_idx]
@@ -356,7 +328,6 @@ def plot_correlation_vs_size_detailed(results, output_path):
     ax.plot(moving_avg_n, moving_avg_r, 'purple', linewidth=4, alpha=0.7,
             label=f'Moving Average (window={window_size})')
     
-    # Performance thresholds
     ax.axhline(0.90, color='#27ae60', linestyle=':', alpha=0.5, linewidth=2)
     ax.axhline(0.70, color='#3498db', linestyle=':', alpha=0.5, linewidth=2)
     ax.axhline(0.50, color='#f39c12', linestyle=':', alpha=0.5, linewidth=2)
@@ -368,7 +339,6 @@ def plot_correlation_vs_size_detailed(results, output_path):
     ax.legend(frameon=True, fancybox=True, shadow=True, fontsize=12, loc='lower right')
     ax.grid(True, alpha=0.3, linewidth=1.2)
     
-    # Add size-based statistics
     small_mask = n_seqs <= 5
     medium_mask = (n_seqs > 5) & (n_seqs <= 15)
     large_mask = n_seqs > 15
@@ -390,13 +360,9 @@ def plot_correlation_vs_size_detailed(results, output_path):
     print(f"✓ Figure 3 saved: {output_path}")
 
 
-# ============================================================================
-# FIGURE 4: Model vs Ground Truth for Top 3 Alignments
-# ============================================================================
 def plot_top_alignments_comparison(results, phyla_model, analyzer, output_path):
     """Compare model vs ground truth for top 3 performers"""
     
-    # Get top 3
     top_3 = sorted(results, key=lambda x: x['r'], reverse=True)[:3]
     
     fig = plt.figure(figsize=(18, 6))
@@ -472,13 +438,9 @@ def plot_top_alignments_comparison(results, phyla_model, analyzer, output_path):
     print(f"✓ Figure 4 saved: {output_path}")
 
 
-# ============================================================================
-# FIGURE 5: Attention Relevance Heatmap (Best Alignment)
-# ============================================================================
 def plot_attention_heatmap_detailed(results, phyla_model, analyzer, output_path):
     """High-quality attention heatmap with sequence annotations"""
     
-    # Get best alignment
     best = max(results, key=lambda x: x['r'])
     alignment_name = best['alignment']
     
@@ -505,14 +467,11 @@ def plot_attention_heatmap_detailed(results, phyla_model, analyzer, output_path)
         
         fig, ax = plt.subplots(figsize=(20, 8))
         
-        # Normalize for visualization
         relevances_norm = relevances / (relevances.max() + 1e-10)
         
-        # Heatmap
         im = ax.imshow(relevances_norm, cmap='YlOrRd', aspect='auto', 
                       interpolation='bilinear', vmin=0, vmax=1)
         
-        # Colorbar
         cbar = plt.colorbar(im, ax=ax, fraction=0.03, pad=0.02)
         cbar.set_label('Normalized Attention Weight\n(Position Importance)', 
                       fontweight='bold', fontsize=14)
@@ -542,9 +501,6 @@ def plot_attention_heatmap_detailed(results, phyla_model, analyzer, output_path)
         print(f"✓ Figure 5 saved: {output_path}")
 
 
-# ============================================================================
-# FIGURE 6: Distance Matrix Comparison (Best Alignment)
-# ============================================================================
 def plot_distance_matrices_detailed(results, phyla_model, analyzer, output_path):
     """Side-by-side distance matrices with difference heatmap"""
     
@@ -575,25 +531,21 @@ def plot_distance_matrices_detailed(results, phyla_model, analyzer, output_path)
         fig = plt.figure(figsize=(20, 6))
         gs = GridSpec(1, 4, width_ratios=[1, 1, 1, 0.05], wspace=0.4)
         
-        # Ensure same scale
         vmin = 0
         vmax = max(model_dist.max(), gt.max())
         
-        # Model predictions
         ax1 = fig.add_subplot(gs[0])
         im1 = ax1.imshow(model_dist, cmap='viridis', vmin=vmin, vmax=vmax, aspect='auto')
         ax1.set_title('Model Predictions', fontweight='bold', fontsize=16)
         ax1.set_xlabel('Sequence Index', fontweight='bold', fontsize=13)
         ax1.set_ylabel('Sequence Index', fontweight='bold', fontsize=13)
         
-        # Ground truth
         ax2 = fig.add_subplot(gs[1])
         im2 = ax2.imshow(gt, cmap='viridis', vmin=vmin, vmax=vmax, aspect='auto')
         ax2.set_title('Ground Truth', fontweight='bold', fontsize=16)
         ax2.set_xlabel('Sequence Index', fontweight='bold', fontsize=13)
         ax2.set_ylabel('Sequence Index', fontweight='bold', fontsize=13)
         
-        # Difference (error) heatmap
         ax3 = fig.add_subplot(gs[2])
         diff = model_dist - gt
         max_diff = max(abs(diff.min()), abs(diff.max()))
@@ -602,7 +554,6 @@ def plot_distance_matrices_detailed(results, phyla_model, analyzer, output_path)
         ax3.set_xlabel('Sequence Index', fontweight='bold', fontsize=13)
         ax3.set_ylabel('Sequence Index', fontweight='bold', fontsize=13)
         
-        # Shared colorbar for distance matrices
         cax = fig.add_subplot(gs[3])
         cbar = plt.colorbar(im2, cax=cax)
         cbar.set_label('Phylogenetic Distance', fontweight='bold', fontsize=14)
@@ -617,9 +568,6 @@ def plot_distance_matrices_detailed(results, phyla_model, analyzer, output_path)
         print(f"✓ Figure 6 saved: {output_path}")
 
 
-# ============================================================================
-# MAIN
-# ============================================================================
 def main():
     print("="*80)
     print("GENERATING HIGH-QUALITY FIGURES FROM FULL 3,321 ALIGNMENT DATASET")
