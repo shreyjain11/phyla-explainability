@@ -1,15 +1,3 @@
-"""
-POSITION-AWARE PHYLOGENETIC ATTRIBUTION
-
-The KEY insight: To get biologically meaningful relevances, we need an objective
-that EXPLICITLY depends on per-position amino acid differences.
-
-Strategy:
-1. Extract per-position embeddings (not just sequence-level)
-2. Compute position-wise phylogenetic signal
-3. Objective: Maximize phylogenetic informativeness at variable positions
-"""
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
