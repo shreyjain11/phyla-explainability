@@ -27,7 +27,7 @@ Validated on **3,321 protein family alignments** from the OpenProtein dataset:
 
 ```bash
 # Clone repository
-git clone https://github.com/YOUR_USERNAME/phyla-explainability.git
+git clone https://github.com/shreyjain11/phyla-explainability.git
 cd phyla-explainability
 
 # Install dependencies
@@ -128,7 +128,7 @@ If you use this code, please cite:
   title = {Phyla Explainability Integration},
   author = {Jain, Shrey},
   year = {2025},
-  url = {https://github.com/YOUR_USERNAME/phyla-explainability}
+  url = {https://github.com/shreyjain11/phyla-explainability}
 }
 ```
 
@@ -140,10 +140,6 @@ And the original Phyla model:
   year = {2024}
 }
 ```
-
-## License
-
-See LICENSE file for details.
 
 ## Contact
 

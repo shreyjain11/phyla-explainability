@@ -1,6 +1,8 @@
 # Python
 __pycache__/
 *.py[cod]
+*.pyo
+*.pyd
 *$py.class
 *.so
 .Python
@@ -28,6 +30,7 @@ wheels/
 *.pt
 *.pth
 *.ckpt
+*.pb
 
 # Jupyter
 .ipynb_checkpoints/
@@ -40,6 +43,7 @@ wheels/
 *.swo
 *~
 .DS_Store
+.cursor/
 
 # Project specific
 weights/
@@ -47,10 +51,32 @@ weights/
 outputs/*.txt
 outputs/figures/*.png
 outputs/figures_full_3321/*.png
-.cursor/
+!outputs/.gitkeep
 
 # Data
 *.fasta
 *.npy
+*.npz
 data/cache/
+*.csv
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Documentation builds
+docs/_build/
+docs/.doctrees/
 
