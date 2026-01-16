@@ -118,3 +118,21 @@ Key findings:
 - Performance degrades with high gap content (>50%) and low sequence diversity
 - Attention patterns reveal phylogenetically informative positions
 - Distance predictions capture evolutionary relationships with moderate-to-strong correlation
+
+---
+
+## Phase 1 Results: CLS Embedding Analysis
+
+### Key Finding
+CLS embeddings encode phylogenetic signal with **mean Spearman r = 0.54 ± 0.23** across 2,367 protein families.
+
+### Critical Bug Discovery
+Identified missing residual connections in `BiMambaWrapper.forward()` - see `docs/RESIDUAL_BUG_FIX.md`
+
+### Results Summary
+| Metric | Value |
+|--------|-------|
+| Alignments analyzed | 2,367 |
+| Mean Spearman r | 0.54 ± 0.23 |
+| Strong correlation (r ≥ 0.7) | 24.1% |
+| p-value | < 0.001 |
